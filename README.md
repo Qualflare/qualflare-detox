@@ -1,5 +1,7 @@
 # @qualflare/detox
 
+[![Qualflare](https://api.qualflare.com/p/qualflare-detox/badge.svg)](https://reports.qualflare.com/p/qualflare-detox/launches)
+
 Qualflare reporting for a [Detox](https://wix.github.io/Detox/) suite: your test
 results, and Detox's own screenshots, videos and device logs attached to the
 tests they came from.
@@ -114,16 +116,26 @@ launch is attributed to the platform it ran on without you configuring it twice.
 
 Detection reads Detox's own session snapshot (`DETOX_CONFIG_SNAPSHOT_PATH`) and
 maps `device.type` by prefix. It is deliberately conservative: a third-party
-device driver, an unreadable snapshot, or a plain `jest` run with no Detox around
-all yield *no* platform rather than a guessed one, because a wrong platform on a
-launch is invisible in a dashboard and mis-attributes the whole run, while an
-absent one is merely absent. Set `platform` yourself to override it.
+device driver whose type starts with neither `ios.` nor `android.`, an unreadable
+snapshot, or a plain `jest` run with no Detox around all decline to guess, rather
+than picking a platform — a wrong platform is invisible in a dashboard and
+mis-attributes a whole run.
+
+**Declining to guess is not the same as leaving it empty**, so it is worth knowing
+what you actually get: this package simply does not set the option, and
+`@qualflare/jest`'s own default then applies, which is `web`. For a Detox suite
+that is not a useful answer, so if you run a custom device driver, set `platform`
+explicitly:
+
+```js
+['@qualflare/detox/reporter', { platform: 'android' }]
+```
+
+Anything you pass always wins over detection.
 
 The documented `device.getPlatform()` is not usable here: it exists only in the
 worker where Detox installed its globals, and a Jest reporter runs in the main
 process.
-
-Anything you pass wins over both defaults.
 
 ## Enriching your tests
 
@@ -138,7 +150,7 @@ it('signs in', async () => {
   await qualflare.step('tap login', async () => {
     await element(by.id('login')).tap();
   });
-  qualflare.attachment('state', JSON.stringify(state), 'application/json');
+  qualflare.attachment('state', JSON.stringify(state), { mimeType: 'application/json' });
 });
 ```
 
@@ -165,11 +177,29 @@ same options.
 
 ```bash
 npm install
-npm test          # unit tests
-npm run build     # dist/ via tsup
+npm test           # unit tests
+npm run build      # dist/ via tsup
+npm run test:built # loads BOTH published formats from dist/ and constructs the reporter
+npm run e2e        # the dogfood suite, then verify the report it produced
 npm run lint
 npm run typecheck
 ```
+
+`test:built` is not optional busywork: the package ships ESM and CJS, and the
+reporter once threw on load from a CommonJS `jest.config` while every unit test
+passed. That suite loads both.
+
+`e2e` runs a Jest suite through the BUILT reporter and then asserts the report
+says what this package is supposed to make it say. It synthesises a Detox session
+snapshot rather than booting a simulator, so what it exercises is this package's
+reading of that file — the part that is ours.
+
+## Test reports
+
+This package reports its own dogfood suite to Qualflare, through itself — the
+reporter under test is the one that produced these runs:
+
+[![Qualflare](https://api.qualflare.com/p/qualflare-detox/banner.svg)](https://reports.qualflare.com/p/qualflare-detox/launches)
 
 ## License
 

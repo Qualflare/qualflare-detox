@@ -1,0 +1,73 @@
+name: CI
+
+# Lint, types, unit tests, and — the one that matters most here — a suite that
+# loads BOTH published module formats from dist/ and constructs the reporter.
+#
+# That last one is not symmetry with the other checks. This package ships ESM and
+# CJS, and the reporter once threw
+#
+#     TypeError: Class extends value #<Object> is not a constructor or null
+#
+# on load from a CommonJS jest.config, while lint, typecheck and every unit test
+# passed, because they all exercise src/ or the ESM build. Shipping two formats
+# and testing one proves nothing about the other.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, types, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # Builds, then loads dist/ as CJS and as ESM. Runs last because it is the
+      # only step that needs the build, and a failure here means what SHIPS is
+      # broken even though the source is fine — worth reading as its own signal.
+      - name: Built package, both module formats
+        run: npm run test:built
+
+      # The tarball is what users actually receive. A files/exports mistake is
+      # invisible to every check above and only shows up on install.
+      - name: Packaged contents
+        run: |
+          npm pack --dry-run 2>&1 | tee pack.txt
+          # dist, README and LICENSE only — no src, no tests, no configs.
+          if grep -qE "npm notice .*(src/|test/|tsconfig|eslint|vitest\.config|tsup\.config)" pack.txt; then
+            echo "::error title=Tarball too broad::Source or config files are in the published package."
+            exit 1
+          fi
+          for required in dist/index.js dist/index.cjs dist/index.d.ts dist/reporter/index.js dist/reporter/index.cjs README.md LICENSE; do
+            grep -q "$required" pack.txt || {
+              echo "::error title=Missing from tarball::$required is declared in exports/files but absent."
+              exit 1
+            }
+          done
