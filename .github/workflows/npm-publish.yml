@@ -1,0 +1,99 @@
+name: Publish npm
+
+# Publishing happens HERE, not from a laptop, and that is not a preference:
+# package.json sets `publishConfig.provenance: true`, and npm can only generate a
+# provenance attestation inside a supported CI with an OIDC token
+# (`id-token: write`). A local `npm publish` fails rather than quietly publishing
+# without provenance, so this workflow is the only path that works.
+#
+# Mirrors the sibling reporters' pattern: build and publish on a version tag,
+# with the tag asserted against package.json first.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  npm-publish:
+    name: Publish @qualflare/detox
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance attestations via Sigstore OIDC
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Matches ci.yml, so the tarball is built on the same Node the test
+          # suite ran against. `engines` allows >=18.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # A tag that disagrees with package.json publishes a version nobody asked
+      # for, under a git ref that does not describe it. Cheapest possible check,
+      # and it runs before anything is built.
+      - name: Verify tag matches package.json version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME (version $TAG_VERSION) does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      # npm unpublish is heavily restricted, so everything that can be checked
+      # before the irreversible step is checked here — including the two gates
+      # that exist because of real failures in this package.
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      # Loads BOTH published module formats from dist/ and constructs the
+      # reporter. This is the check that catches an ESM/CJS interop break, which
+      # once made the reporter unloadable from a CommonJS jest.config while every
+      # other check above passed. Publishing that would have been unrecoverable.
+      - run: npm run test:built
+
+      # The dogfood suite, end to end against the built reporter. No upload here:
+      # the E2E workflow owns the Qualflare launch on every push to main, and a
+      # tag build should not add a second launch for the same commit.
+      - name: Dogfood the built reporter
+        run: npm run e2e
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
+
+      # `npm publish` exiting 0 means the registry accepted the tarball. It does
+      # not prove the version is installable, or that provenance actually
+      # attached — and this family has been bitten before by treating a 2xx as
+      # proof that the thing downstream users read had changed.
+      - name: Verify the published version resolves
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            PUBLISHED="$(npm view "@qualflare/detox@${GITHUB_REF_NAME#v}" version 2>/dev/null || true)"
+            [ -n "$PUBLISHED" ] && break
+            echo "not visible on the registry yet (attempt $attempt); waiting"
+            sleep 10
+          done
+          if [ -z "${PUBLISHED:-}" ]; then
+            echo "::error title=Published but not resolvable::npm publish succeeded but @qualflare/detox@${GITHUB_REF_NAME#v} does not resolve."
+            exit 1
+          fi
+          echo "@qualflare/detox@$PUBLISHED resolves"
+          # Provenance is the reason this job exists at all, so its absence is an
+          # error rather than a note.
+          if npm view "@qualflare/detox@$PUBLISHED" dist.attestations --json 2>/dev/null | grep -q provenance; then
+            echo "provenance attestation present"
+          else
+            echo "::error title=No provenance::The version published without a provenance attestation, though publishConfig requests one."
+            exit 1
+          fi
