@@ -1,0 +1,82 @@
+{
+  "name": "@qualflare/detox",
+  "version": "0.1.0",
+  "description": "Qualflare reporting for Detox — Jest-native results plus Detox's own screenshots, videos and device logs attached to the tests they came from.",
+  "keywords": [
+    "qualflare",
+    "detox",
+    "detox-reporter",
+    "react-native",
+    "react-native-testing",
+    "e2e",
+    "mobile-testing",
+    "test-reporter",
+    "test-reporting",
+    "test-results",
+    "flaky-tests"
+  ],
+  "homepage": "https://qualflare.com/detox-test-reporting/",
+  "bugs": {
+    "url": "https://github.com/Qualflare/qualflare-detox/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Qualflare/qualflare-detox.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Qualflare",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./reporter": {
+      "types": "./dist/reporter/index.d.ts",
+      "import": "./dist/reporter/index.js",
+      "require": "./dist/reporter/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "@qualflare/jest": "^0.1.2"
+  },
+  "peerDependencies": {
+    "detox": ">=20.0.0",
+    "jest": ">=29.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^18.19.50",
+    "eslint": "^10.9.1",
+    "prettier": "^3.3.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.5.0",
+    "vitest": "^3.2.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run test/unit",
+    "prepublishOnly": "npm run build"
+  }
+}
