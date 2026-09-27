@@ -1,6 +1,8 @@
-import QualflareJestReporter from '@qualflare/jest/reporter';
+import type QualflareJestReporterClass from '@qualflare/jest/reporter';
+import * as qualflareJestReporterModule from '@qualflare/jest/reporter';
 
 import { withDetoxDefaults, type QualflareDetoxOptions } from './defaults.js';
+import { resolveDefaultExport } from './interop.js';
 
 /** Only the fields the base reporter reads; mirrors its own local interface
  * rather than importing Jest's types, so this package needs no dependency on
@@ -9,6 +11,13 @@ interface JestGlobalConfig {
   rootDir?: string;
   shard?: { shardIndex: number; shardCount: number };
 }
+
+/** The base class, unwrapped — see interop.ts for why this indirection is not
+ * optional. The type comes from a separate `import type`, so the subclass keeps
+ * the base's full public type even though the value arrives untyped. */
+const QualflareJestReporter = resolveDefaultExport(
+  qualflareJestReporterModule,
+) as typeof QualflareJestReporterClass;
 
 /**
  * `@qualflare/jest`'s reporter with Detox's defaults applied.
