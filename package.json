@@ -1,19 +1,19 @@
 {
   "name": "@qualflare/detox",
   "version": "0.1.0",
-  "description": "Qualflare reporting for Detox — Jest-native results plus Detox's own screenshots, videos and device logs attached to the tests they came from.",
+  "description": "Native Detox reporter for Qualflare — captures status, per-attempt retry history, flakiness, nested steps and attachments, plus Detox's own screenshots, videos and device logs attached to the tests they came from.",
   "keywords": [
     "qualflare",
     "detox",
     "detox-reporter",
-    "react-native",
-    "react-native-testing",
-    "e2e",
-    "mobile-testing",
     "test-reporter",
     "test-reporting",
     "test-results",
-    "flaky-tests"
+    "flaky-tests",
+    "e2e",
+    "react-native",
+    "react-native-testing",
+    "mobile-testing"
   ],
   "homepage": "https://qualflare.com/detox-test-reporting/",
   "bugs": {
