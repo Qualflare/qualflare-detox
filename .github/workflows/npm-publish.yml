@@ -78,14 +78,35 @@ jobs:
       # proof that the thing downstream users read had changed.
       - name: Verify the published version resolves
         run: |
-          for attempt in 1 2 3 4 5 6; do
-            PUBLISHED="$(npm view "@qualflare/detox@${GITHUB_REF_NAME#v}" version 2>/dev/null || true)"
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # 5 minutes, not 1. The registry's READ path lags its write path, and it
+          # lags much longer for the FIRST publish of a new package name than for
+          # a later version of an existing one. v0.1.0 took well over a minute to
+          # become resolvable, so a 60s budget reported a perfectly good publish
+          # as a failure.
+          for attempt in $(seq 1 20); do
+            PUBLISHED="$(npm view "@qualflare/detox@$VERSION" version 2>/dev/null || true)"
             [ -n "$PUBLISHED" ] && break
-            echo "not visible on the registry yet (attempt $attempt); waiting"
-            sleep 10
+            echo "not visible on the registry yet (attempt $attempt of 20); waiting"
+            sleep 15
           done
+
           if [ -z "${PUBLISHED:-}" ]; then
-            echo "::error title=Published but not resolvable::npm publish succeeded but @qualflare/detox@${GITHUB_REF_NAME#v} does not resolve."
+            # Distinguish the two causes rather than reporting both as "does not
+            # resolve". An anonymous 404 on a scoped package looks identical
+            # whether it is still propagating or was published RESTRICTED, and
+            # those need opposite responses: wait, versus fix access and re-publish.
+            ACCESS="$(npm access get status "@qualflare/detox" 2>/dev/null || true)"
+            echo "npm access get status -> ${ACCESS:-unknown}"
+            case "$ACCESS" in
+              *public*)
+                echo "::error title=Published, public, still propagating::@qualflare/detox@$VERSION is public but not resolvable after 5 minutes. The publish itself succeeded — check the registry before re-running anything."
+                ;;
+              *)
+                echo "::error title=Published RESTRICTED::@qualflare/detox@$VERSION is not public, so it 404s for everyone else. publishConfig.access is meant to prevent this."
+                ;;
+            esac
             exit 1
           fi
           echo "@qualflare/detox@$PUBLISHED resolves"
