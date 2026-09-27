@@ -4,16 +4,22 @@ Qualflare reporting for a [Detox](https://wix.github.io/Detox/) suite: your test
 results, and Detox's own screenshots, videos and device logs attached to the
 tests they came from.
 
-## What this package is, plainly
+This is the package to install for a Detox suite. It reports statuses,
+durations, per-attempt retry history, steps and your own metadata, resolves
+whether the run targeted iOS or Android, and labels the launch as Detox.
 
-**Detox runs on Jest**, so the reporter is `@qualflare/jest`'s. This package is
-that reporter with Detox's defaults applied and Detox-shaped documentation. It
-contains almost no logic, and saying so up front is more useful than implying a
-separate Detox engine that does not exist.
+## How it works under the hood
 
-That matters because it tells you where to look when something is wrong:
-statuses, durations, retry history, steps and the `qualflare.*` API are all
-`@qualflare/jest` behaviour, documented there and fixed there.
+**Detox runs on Jest** — `detox test` drives Jest with a Detox test environment —
+so this package builds on `@qualflare/jest` rather than reimplementing a reporter
+for a runner Detox does not have. It instantiates that reporter with
+Detox-appropriate configuration; it does not subclass it, so the two packages
+version independently.
+
+Knowing that is useful when something looks wrong: the mechanics of collecting a
+test result are `@qualflare/jest` behaviour, so that is where the deep
+configuration reference lives. You do not need to install it — it comes as a
+dependency of this package.
 
 What is genuinely Detox-specific is **not in this package at all**. Detox writes
 its artifacts to disk, one directory per test, and associating them with your
